@@ -44,7 +44,11 @@ class WaypointUpdater(object):
         self.pose = None    # variable for current pose
         self.lane = Lane()
         self.base_waypoints = None
-#        self.frame_id = None
+        self.frame_id = None
+        self.previous_car_waypoint = 0;
+        
+        #self.car_index_pub = rospy.Publisher('car_index', Int32, queue_size=1)
+
         rospy.spin()
             
     def pose_cb(self, msg):
@@ -95,6 +99,12 @@ class WaypointUpdater(object):
         return closest_waypoint
     
     def distance(self, p1, p2):
+#        dist = 0
+#        dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
+#        for i in range(wp1, wp2+1):
+#            dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
+#            wp1 = i
+#        return dist
         # [Dmitry, 11.09.2017]
         dx = p1.x - p2.x
         dy = p1.y - p2.y
