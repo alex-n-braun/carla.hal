@@ -5,7 +5,9 @@ from geometry_msgs.msg import PoseStamped
 from styx_msgs.msg import Lane, Waypoint
 
 import math
+from math import cos, sin, sqrt
 import numpy as np
+import tf
 
 '''
 This node will publish waypoints from the car's current position to some `x` distance ahead.
@@ -23,8 +25,8 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 MPH_TO_MPS = 0.44704
 MAX_SPEED = 10.0 * MPH_TO_MPS #: Vehicle speed limit
-LOOKAHEAD_WPS = 30 # Number of waypoints we will publish. You can change this number
 
+LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
 LOOKBACK_WPS = 10 # Number of waypoints to keep in the back for interpolation
 
 
@@ -41,70 +43,69 @@ class WaypointUpdater(object):
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
         # TODO: Add other member variables you need below
-        self.pose = None    # variable for current pose
-        self.lane = Lane()
-        self.base_waypoints = None
-        self.frame_id = None
-        self.previous_car_waypoint = 0;
+        self.pose = None            # car current position to estimate respective forward waypoints
+        self.lane = Lane()          # lane object, which we use to publish forward waypoints
+        self.base_waypoints = None  # waypoints from the map
+        self.frame_id = None        
         
-        #self.car_index_pub = rospy.Publisher('car_index', Int32, queue_size=1)
+        rospy.logwarn("Waypoint Updater initiated")
+        self.loop()                 # launch infinite cycle to publish forward waypoints, based on current position
+        
+    def loop(self):
+        
+        rate = rospy.Rate(50)       # setting refresh rate in Mhz
 
-        rospy.spin()
+        while not rospy.is_shutdown():
+            
+            rate.sleep()
+        
+            if (self.base_waypoints is not None) and (self.pose is not None):
+                # [Dmitry, 11.09.2017] - let's determine where we are and where are we heading                
+                
+                # identify the closest waypoint in front of the car
+                start_point = self.closest_waypoint(self.pose, self.base_waypoints)
+                
+                # get the next 200 waypoints ahead and fill in lane object before publishing
+                self.lane.waypoints = self.base_waypoints[start_point: start_point + LOOKAHEAD_WPS]
+                self.lane.header.frame_id = self.frame_id
+                self.lane.header.stamp = rospy.Time.now()
+                                        
+                # [Dmitry, 16.09.2017] setting the target speed for each forward waypoint
+                # [Dmitry, 16.09.2017] now - just constant speed. Once traffic lights will be fixed, implement logic, 
+                # based on distance to the next trafic light and its status
+                for waypoint in self.lane.waypoints:
+                    # UPDATE WITH TRAFFIC LIGHT LOGIC
+                    waypoint.twist.twist.linear.x = MAX_SPEED
+                        
+                # [Dmitry, 11.09.2017] publish forward waypoints
+                self.final_waypoints_pub.publish(self.lane)
+            
+            else:
+                rospy.loginfo("---- no data!! ----")
             
     def pose_cb(self, msg):
         # TODO: Implement - pose callback will be called to get the next waypoints
-        self.pose = msg.pose # store location (x, y)
-        
-        if (self.base_waypoints is not None) and (self.pose is not None):
-    
-            # [Dmitry, 11.09.2017] - let's determine where we are and where are we heading
-            #rospy.logwarn("get to this point")
-                
-            #waypoints = self.base_waypoints.waypoints
-                    
-            self.lane.header.stamp = rospy.Time.now()
-            start_point = self.closest_waypoint(self.pose, self.base_waypoints)
-            
-            rospy.logwarn(start_point)
-            #all_waypoints = waypoints + waypoints[:LOOKAHEAD_WPS]
-            self.lane.waypoints = self.base_waypoints[start_point: start_point + LOOKAHEAD_WPS]
-            
-            #wp = np.array(self.lane.waypoints)
-            #rospy.logwarn("waypoints shape "+str(wp.shape))
-    
-                    
-            for waypoint in self.lane.waypoints:
-                waypoint.twist.twist.linear.x = MAX_SPEED
-                    
-            self.final_waypoints_pub.publish(self.lane)
-        
-        else:
-            rospy.loginfo("---- no data!! ----")            
-
+        self.pose = msg.pose                    # store location (x, y)
+        self.frame_id = msg.header.frame_id
            
     def closest_waypoint(self, Pose, waypoints):
         # [Dmitry, 11.09.2017]
         closest_waypoint = 0
-        #rospy.logwarn(Pose)
-        #rospy.logwarn(len(waypoints))
-        
-        min_dist = 100000 #self.distance(Pose.position, waypoints[best_waypoint].pose.pose.position)
+        min_dist = float('inf')
         
         for i, point in enumerate(waypoints):
             dist = self.distance(Pose.position, point.pose.pose.position)
             if dist < min_dist:
                 closest_waypoint = i
                 min_dist = dist
-        #rospy.logwarn("best waypoint "+ str(closest_waypoint))                
+        
+        is_behind = self.is_waypoint_behind(Pose, waypoints[closest_waypoint])
+        if is_behind:
+            closest_waypoint += 1
+        
         return closest_waypoint
     
     def distance(self, p1, p2):
-#        dist = 0
-#        dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
-#        for i in range(wp1, wp2+1):
-#            dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
-#            wp1 = i
-#        return dist
         # [Dmitry, 11.09.2017]
         dx = p1.x - p2.x
         dy = p1.y - p2.y
@@ -129,7 +130,29 @@ class WaypointUpdater(object):
 
     def set_waypoint_velocity(self, waypoints, waypoint, velocity):
         waypoints[waypoint].twist.twist.linear.x = velocity
+                
+ 
+    def is_waypoint_behind(self, pose, waypoint):
+        yaw = self.get_Euler(pose)
+        X = pose.position.x
+        Y = pose.position.y
+    
+        shift_x = waypoint.pose.pose.position.x - X
+        shift_y = waypoint.pose.pose.position.y - Y
+    
+        x = shift_x * cos(0 - yaw) - shift_y * sin(0 - yaw)
+    
+        if x > 0:
+            return False
+        return True
 
+    def get_Euler(self, pose):
+        # Returns the roll, pitch yaw angles from a Quaternion \
+        _, _, yaw = tf.transformations.euler_from_quaternion([pose.orientation.x,
+                                                         pose.orientation.y,
+                                                         pose.orientation.z,
+                                                         pose.orientation.w])
+        return yaw
 
 
 if __name__ == '__main__':
