@@ -9,9 +9,10 @@ from flask import Flask, render_template
 from bridge import Bridge
 from conf import conf
 
-sio = socketio.Server()
+eventlet.monkey_patch()
+sio = socketio.Server(async_mode='eventlet')
 app = Flask(__name__)
-bridge = Bridge(conf)
+#bridge = Bridge(conf)
 msgs = []
 
 dbw_enable = False
@@ -25,7 +26,7 @@ def send(topic, data):
     msgs.append((topic, data))
     #sio.emit(topic, data=json.dumps(data), skip_sid=True)
 
-bridge.register_server(send)
+bridge = Bridge(conf, send)
 
 @sio.on('telemetry')
 def telemetry(sid, data):
