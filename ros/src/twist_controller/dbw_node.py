@@ -3,17 +3,18 @@
 import rospy
 from std_msgs.msg import Bool
 from dbw_mkz_msgs.msg import ThrottleCmd, SteeringCmd, BrakeCmd, SteeringReport
-from geometry_msgs.msg import TwistStamped
-import math
 from styx_msgs.msg import Lane, Waypoint
-
-from twist_controller import Controller
+from geometry_msgs.msg import TwistStamped, PoseStamped
+import math
 
 from pid import PID
+
+#from twist_controller import Controller
+
 import time
 import numpy as np
 
-LOOKAHEAD_WPS = 30 # Number of waypoints we will publish. You can change this number
+LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
 
 
 '''
@@ -62,71 +63,55 @@ class DBWNode(object):
                                          BrakeCmd, queue_size=1)
 
         # TODO: Create `TwistController` object
-        #self.controller = TwistController(<Arguments you wish to provide>)
+        #self.controller = Controller(0.0)
 
         # TODO: Subscribe to all the topics you need to
+        self.dbw_enabled = False
         rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_cb, queue_size=1)
         rospy.Subscriber('/final_waypoints', Lane, self.waypoints_cb, queue_size=1)
-        #rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb, queue_size=1)
-        #rospy.Subscriber('/current_velocity', TwistStamped, self.velocity_cb, queue_size=1)
+        rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb, queue_size=1)
+        rospy.Subscriber('/current_velocity', TwistStamped, self.velocity_cb, queue_size=1)
         #rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cb, queue_size=1)
         
         # Some important variables:
         self.current_pose = None
-        self.final_waypoints = None
+        self.waypoints = None
         self.vel_cur = 0.0
         self.vel_ref = 0.0
-        self.prev_vel_ref = 0.0
-        self.dbw_enabled = False
         self.previous_timestamp = rospy.get_rostime().secs
         self.current_timestamp = 0.0
         self.delta_t = 0.0
  
-        # defining 2 PID controllers
-        self.V_pid = PID(kp=1.0, ki=0.015, kd=0.0)
-        self.S_pid = PID(kp=0.2, ki=0.001, kd=0.5)
-
+        rospy.logwarn("DBWNode is initiated")
         self.loop()
 
     def loop(self):
-        rate = rospy.Rate(30) # 30Hz
+        rate = rospy.Rate(50) # 30Hz
         while not rospy.is_shutdown():
             # TODO: Get predicted throttle, brake, and steering using `twist_controller`
             # You should only publish the control commands if dbw is enabled
             current_time = rospy.get_rostime()
             current_secs = current_time.secs
             current_nsecs = current_time.nsecs
+            
             self.current_timestamp = current_secs + current_nsecs/1000000000.0
             self.delta_t = (self.current_timestamp - self.previous_timestamp)
             self.previous_timestamp = self.current_timestamp
-
-            self.dbw_enabled = True
             
-            if self.dbw_enabled:
-                #vel = self.vel_ref - self.vel_cur
-            
-                #CTE = self.get_CTE(self.final_waypoints, self.current_pose)
-            
+            #rospy.logwarn("DWB_ENABLED = "+str(self.dbw_enabled))
+                        
+            if self.dbw_enabled is True:
                 #throttle, brake, steering = self.controller.control(<proposed linear velocity>,
                 #                                                     <proposed angular velocity>,
                 #                                                     <current linear velocity>,
                 #                                                     <dbw status>,
                 #                                                     <any other argument you need>)
+                throttle = 0.5
+                brake = 0.0
+                steering = 0.0
             
-                #throttle = self.V_pid.step(vel, self.delta_t)
-                #brake = 0.0
-                #if throttle < 0:
-                #    brake = -20000.0*throttle
-                #    throttle = 0.0
-                #    self.V_pid.reset()
-                
-                #steering = self.S_pid.step(CTE, self.delta_t)
-            
-                self.publish(10.0, 1.0, 0.0)
+                self.publish(throttle, brake, steering)
                 rospy.logwarn("published")
-#                self.publish(throttle, brake, steering)
-            else:
-                rospy.logwarn("DWB_DISABLED")                
                 
             rate.sleep()
 
@@ -149,61 +134,29 @@ class DBWNode(object):
         self.brake_pub.publish(bcmd)
 
     def dbw_cb(self, msg):
-        if (msg.data == True):
-            self.dbw_enabled = True
-        else:
-            self.dbw_enabled = False
+        rospy.logwarn("dwb_enabled from msg " + str(bool(msg.data)))
+        self.dbw_enabled = bool(msg.data)
 
-    #def velocity_cb(self, message):
-    #    """From the incoming message extract the velocity message """
-    #    self.velocity = message.twist
+    def velocity_cb(self, message):
+        """From the incoming message extract the velocity message """
+        self.vel_cur = message.twist
 
     def pose_cb(self, message):
         """From the incoming message extract the pose message """
+        #rospy.logwarn("pose received")
         self.current_pose = message.pose
 
-    #def twist_cb(self, message):
-    #    """From the incoming message extract the pose message """
-    #    self.twist = message.twist
+    def twist_cb(self, message):
+        """From the incoming message extract the pose message """
+        self.twist = message.twist
 
     def waypoints_cb(self, message):
         """Update final waypoints array when a new message arrives
         on the corresponding channel
         """
-        self.final_waypoints = message.waypoints
-        
-    def get_CTE(self, waypoints, current_pose):
-        # Extract x and y from waypoints
-        points_x = [i.pose.pose.position.x for i in waypoints]
-        points_y = [i.pose.pose.position.y for i in waypoints]
-        # Decrease length of the lists
-        points_x = points_x[0:LOOKAHEAD_WPS]
-        points_y = points_y[0:LOOKAHEAD_WPS]
-        # Transform our points into the car coordinate system:
-        points_x_car = []
-        points_y_car = []
-        # From Quaternion to Euler angles:
-        x = current_pose.orientation.x
-        y = current_pose.orientation.y
-        z = current_pose.orientation.z
-        w = current_pose.orientation.w
-        # Determine car heading:
-        t3 = 2.0 * (w * z + x*y)
-        t4 = 1.0 - 2.0 * (y*y + z*z)
-        theta = math.degrees(math.atan2(t3, t4))
-        # Perform coordinate transformation:
-        for i in range(len(points_x)):
-            Xcar = (points_y[i]-current_pose.position.y)*math.sin(math.radians(theta))-(current_pose.position.x-points_x[i])*math.cos(math.radians(theta))
-            Ycar = (points_y[i]-current_pose.position.y)*math.cos(math.radians(theta))-(points_x[i]-current_pose.position.x)*math.sin(math.radians(theta))
-            points_x_car.append(Xcar)
-            points_y_car.append(Ycar)
-        # Interpolate points in the vehicle coordinate system:
-        coeff_xy = list(reversed(np.polyfit(points_x_car, points_y_car, 3)))
-        dist_y = 0
-        for p, coeff in enumerate(coeff_xy):
-            dist_y += coeff * (2.0 ** p)
-
-        return dist_y
+        #rospy.logwarn("waypoints received")
+        self.waypoints = message.waypoints
+        # target velocity for each waypoint sits in waypoint.twist.twist.linear.x
 
 if __name__ == '__main__':
     DBWNode()
