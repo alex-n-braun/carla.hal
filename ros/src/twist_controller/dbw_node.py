@@ -7,14 +7,13 @@ from styx_msgs.msg import Lane, Waypoint
 from geometry_msgs.msg import TwistStamped, PoseStamped
 import math
 
+from twist_controller import Controller
 from pid import PID
-
-#from twist_controller import Controller
 
 import time
 import numpy as np
 
-LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
+LOOKAHEAD_WPS = 30 # Number of waypoints we will publish. You can change this number
 
 
 '''
@@ -63,56 +62,63 @@ class DBWNode(object):
                                          BrakeCmd, queue_size=1)
 
         # TODO: Create `TwistController` object
-        #self.controller = Controller(0.0)
+        self.controller = Controller()
 
         # TODO: Subscribe to all the topics you need to
-        self.dbw_enabled = False
-        rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_cb, queue_size=1)
-        rospy.Subscriber('/final_waypoints', Lane, self.waypoints_cb, queue_size=1)
-        rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb, queue_size=1)
-        rospy.Subscriber('/current_velocity', TwistStamped, self.velocity_cb, queue_size=1)
-        #rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cb, queue_size=1)
-        
+
+        rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb, queue_size=1)
+
+        rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb, queue_size=1)
+        rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cmd_cb, queue_size=1)
+
         # Some important variables:
+        self.dbw_enabled = False
+        self.curr_linear_velocity = 0.0
+        self.curr_angular_velocity = 0.0
+        self.des_linear_velocity = 0.0
+        self.des_angular_velocity = 0.0
+
+        self.previous_timestamp = rospy.get_rostime().secs
+        self.current_timestamp = 0.0
+
+        # not needed?
         self.current_pose = None
-        self.waypoints = None
+        self.final_waypoints = None
         self.vel_cur = 0.0
         self.vel_ref = 0.0
         self.previous_timestamp = rospy.get_rostime().secs
         self.current_timestamp = 0.0
         self.delta_t = 0.0
- 
-        rospy.logwarn("DBWNode is initiated")
         self.loop()
 
     def loop(self):
-        rate = rospy.Rate(50) # 30Hz
+        rate = rospy.Rate(20) # 20Hz
+
         while not rospy.is_shutdown():
             # TODO: Get predicted throttle, brake, and steering using `twist_controller`
             # You should only publish the control commands if dbw is enabled
             current_time = rospy.get_rostime()
             current_secs = current_time.secs
             current_nsecs = current_time.nsecs
-            
+
             self.current_timestamp = current_secs + current_nsecs/1000000000.0
             self.delta_t = (self.current_timestamp - self.previous_timestamp)
             self.previous_timestamp = self.current_timestamp
-            
-            #rospy.logwarn("DWB_ENABLED = "+str(self.dbw_enabled))
-                        
-            if self.dbw_enabled is True:
-                #throttle, brake, steering = self.controller.control(<proposed linear velocity>,
-                #                                                     <proposed angular velocity>,
-                #                                                     <current linear velocity>,
-                #                                                     <dbw status>,
-                #                                                     <any other argument you need>)
-                throttle = 0.5
-                brake = 0.0
-                steering = 0.0
-            
+
+            #self.dbw_enabled = True
+
+            if self.dbw_enabled:
+                lin_vel_err = self.des_linear_velocity - self.curr_linear_velocity
+                ang_vel_err = self.des_angular_velocity - self.curr_angular_velocity
+                #rospy.logwarn("current velocity error: "+str(lin_vel_err)+", "+str(ang_vel_err))
+
+                #CTE = self.get_CTE(self.final_waypoints, self.current_pose)
+                throttle, brake, steering = self.controller.control(self.delta_t, lin_vel_err, ang_vel_err)
+
                 self.publish(throttle, brake, steering)
-                rospy.logwarn("published")
-                
+            else:
+                pass
+
             rate.sleep()
 
     def publish(self, throttle, brake, steer):
@@ -141,22 +147,28 @@ class DBWNode(object):
         """From the incoming message extract the velocity message """
         self.vel_cur = message.twist
 
-    def pose_cb(self, message):
-        """From the incoming message extract the pose message """
-        #rospy.logwarn("pose received")
-        self.current_pose = message.pose
+    def dbw_enabled_cb(self, msg):
 
-    def twist_cb(self, message):
-        """From the incoming message extract the pose message """
-        self.twist = message.twist
+        if (msg.data == True):
 
-    def waypoints_cb(self, message):
-        """Update final waypoints array when a new message arrives
-        on the corresponding channel
-        """
-        #rospy.logwarn("waypoints received")
-        self.waypoints = message.waypoints
-        # target velocity for each waypoint sits in waypoint.twist.twist.linear.x
+            self.dbw_enabled = True
+            rospy.logwarn("DBW_ENABLED")
+        else:
+            self.dbw_enabled = False
+            rospy.logwarn("DBW_DISABLED")
+
+
+    def current_velocity_cb(self, message):
+    #    """From the incoming message extract the velocity message """
+        self.curr_linear_velocity = message.twist.linear.x
+        self.curr_angular_velocity = message.twist.angular.z
+        #rospy.logwarn("current velocities: "+str(self.curr_linear_velocity)+", "+str(self.curr_angular_velocity))
+
+    def twist_cmd_cb(self, message):
+    #    """From the incoming message extract the desired velocity (twist) message """
+        self.des_linear_velocity = message.twist.linear.x
+        self.des_angular_velocity = message.twist.angular.z
+        #rospy.logwarn("desired velocities: "+str(self.des_linear_velocity)+", "+str(self.des_angular_velocity))
 
 if __name__ == '__main__':
     DBWNode()
