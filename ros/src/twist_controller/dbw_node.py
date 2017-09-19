@@ -8,6 +8,7 @@ from geometry_msgs.msg import TwistStamped, PoseStamped
 import math
 
 from twist_controller import Controller
+from yaw_controller import YawController
 from pid import PID
 
 import time
@@ -62,7 +63,11 @@ class DBWNode(object):
                                          BrakeCmd, queue_size=1)
 
         # TODO: Create `TwistController` object
-        self.controller = Controller()
+        self.controller = Controller(
+            YawController(wheel_base, steer_ratio, 0.001, max_lat_accel, max_steer_angle),
+            wheel_radius * vehicle_mass)
+        # min_speed = 0.001: in YawController.get_angle, it is divided by a radius that is 
+        # proportional to current speed. To avoid division by zero, we need a minimum speed.
 
         # TODO: Subscribe to all the topics you need to
 
@@ -80,19 +85,16 @@ class DBWNode(object):
 
         self.previous_timestamp = rospy.get_rostime().secs
         self.current_timestamp = 0.0
-
-        # not needed?
-        self.current_pose = None
-        self.final_waypoints = None
         self.vel_cur = 0.0
-        self.vel_ref = 0.0
-        self.previous_timestamp = rospy.get_rostime().secs
-        self.current_timestamp = 0.0
+
         self.delta_t = 0.0
         self.loop()
 
     def loop(self):
         rate = rospy.Rate(20) # 20Hz
+
+        # counter = 0  # just for testing throttle _AND_ brake
+        # des_linear_velocity = self.des_linear_velocity
 
         while not rospy.is_shutdown():
             # TODO: Get predicted throttle, brake, and steering using `twist_controller`
@@ -107,19 +109,26 @@ class DBWNode(object):
 
             #self.dbw_enabled = True
 
-            if self.dbw_enabled:
-                lin_vel_err = self.des_linear_velocity - self.curr_linear_velocity
-                ang_vel_err = self.des_angular_velocity - self.curr_angular_velocity
-                #rospy.logwarn("current velocity error: "+str(lin_vel_err)+", "+str(ang_vel_err))
+            #if counter>100: # just for testing throttle _AND_ brake
+            #    counter = 0.
+            #    if des_linear_velocity == 0.:
+            #        des_linear_velocity = self.des_linear_velocity
+            #    else:
+            #        des_linear_velocity = 0.
+            #    rospy.logwarn("speed = "+str(des_linear_velocity))
 
-                #CTE = self.get_CTE(self.final_waypoints, self.current_pose)
-                throttle, brake, steering = self.controller.control(self.delta_t, lin_vel_err, ang_vel_err)
+            if self.dbw_enabled:
+                throttle, brake, steering = self.controller.control(
+                    self.delta_t, self.des_linear_velocity, self.des_angular_velocity,
+                    self.curr_linear_velocity)
 
                 self.publish(throttle, brake, steering)
             else:
                 pass
 
             rate.sleep()
+            # counter = counter + 1 # just for testing throttle _AND_ brake
+            
 
     def publish(self, throttle, brake, steer):
         tcmd = ThrottleCmd()
@@ -139,14 +148,6 @@ class DBWNode(object):
         bcmd.pedal_cmd = brake
         self.brake_pub.publish(bcmd)
 
-    def dbw_cb(self, msg):
-        rospy.logwarn("dwb_enabled from msg " + str(bool(msg.data)))
-        self.dbw_enabled = bool(msg.data)
-
-    def velocity_cb(self, message):
-        """From the incoming message extract the velocity message """
-        self.vel_cur = message.twist
-
     def dbw_enabled_cb(self, msg):
 
         if (msg.data == True):
@@ -162,13 +163,11 @@ class DBWNode(object):
     #    """From the incoming message extract the velocity message """
         self.curr_linear_velocity = message.twist.linear.x
         self.curr_angular_velocity = message.twist.angular.z
-        #rospy.logwarn("current velocities: "+str(self.curr_linear_velocity)+", "+str(self.curr_angular_velocity))
 
     def twist_cmd_cb(self, message):
     #    """From the incoming message extract the desired velocity (twist) message """
         self.des_linear_velocity = message.twist.linear.x
         self.des_angular_velocity = message.twist.angular.z
-        #rospy.logwarn("desired velocities: "+str(self.des_linear_velocity)+", "+str(self.des_angular_velocity))
 
 if __name__ == '__main__':
     DBWNode()
