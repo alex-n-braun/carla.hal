@@ -193,7 +193,7 @@ class TLDetector(object):
         car_wp_idx = None
         if(self.pose and self.base_waypoints != None):
             car_wp_idx = self.get_closest_waypoint(self.pose)
-            #rospy.logwarn(car_wp_idx)
+            #rospy.logwarn(["car index: ", car_wp_idx])
 
         # find the closest visible traffic light (if one exists)
         light_wp_idx = None
@@ -207,7 +207,7 @@ class TLDetector(object):
                     # minus LIGHTGAP so that the car stops near the stop line
                     light_wp_idx = tl_wp_idx - LIGHTGAP
                     light = self.lights[i]
-                    #rospy.logwarn(light_wp_idx)
+                    #rospy.logwarn(["tl index: ", light_wp_idx])
                     #rospy.logwarn(tl_waypoint_indices)
 
         if light:
