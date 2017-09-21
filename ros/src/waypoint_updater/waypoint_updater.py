@@ -89,7 +89,7 @@ class WaypointUpdater(object):
                         #    target_speed = MAX_SPEED / 3.0 
                         #if(distance_to_tl < 1) and (distance_to_tl > 0.5):
                         #    target_speed = 0.0
-                    rospy.logwarn("c_wp = " + str(start) + ", tl_wp = " + str(self.next_traffic_light_index))                
+                    #rospy.logwarn("c_wp = " + str(start) + ", tl_wp = " + str(self.next_traffic_light_index))                
 
                     self.base_waypoints[start + i].twist.twist.linear.x = target_speed
                         
