@@ -26,6 +26,8 @@ class TLDetector(object):
         self.base_waypoints = None
         self.camera_image = None
         self.lights = []
+        
+        self.has_image = False
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -59,10 +61,10 @@ class TLDetector(object):
     def pose_cb(self, msg):
         self.pose = msg.pose
 
-    def waypoints_cb(self, data):
+    def waypoints_cb(self, data): # is only called once
         self.base_waypoints = data.waypoints
 
-    def traffic_cb(self, msg):
+    def traffic_cb(self, msg):  # call-back for cheating, as long as we dont have a classifier
         self.lights = msg.lights
 
     def image_cb(self, msg):
@@ -187,36 +189,35 @@ class TLDetector(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
-        light = None # TrafficLight object
+        
+        # check if all necessary information is available
+        if (self.pose == None or self.base_waypoints == None):
+            return -1, TrafficLight.UNKNOWN
+        
         light_positions = self.config['stop_line_positions']
+
         # find the waypoint index that is closest to the car
-        car_wp_idx = None
-        if(self.pose and self.base_waypoints != None):
-            car_wp_idx = self.get_closest_waypoint(self.pose)
-            #rospy.logwarn(car_wp_idx)
+        car_wp_idx = self.get_closest_waypoint(self.pose)
 
         # find the closest visible traffic light (if one exists)
         light_wp_idx = None
-        tl_waypoint_indices = None
-        if self.base_waypoints != None and car_wp_idx != None:
-            tl_waypoint_indices = self.get_traffic_light_wp_index(light_positions)
-            for i, tl_wp_idx in enumerate(tl_waypoint_indices):
-                idx_diff = tl_wp_idx - car_wp_idx
-                # traffic light is ahead of the car within number of LOOKAHEAD_WPS
-                if idx_diff >= 0 and idx_diff <= LOOKAHEAD_WPS:
-                    # minus LIGHTGAP so that the car stops near the stop line
-                    light_wp_idx = tl_wp_idx - LIGHTGAP
-                    light = self.lights[i]
-                    #rospy.logwarn(light_wp_idx)
-                    #rospy.logwarn(tl_waypoint_indices)
+        light = None # TrafficLight object
+
+        tl_waypoint_indices = self.get_traffic_light_wp_index(light_positions)
+        for i, tl_wp_idx in enumerate(tl_waypoint_indices):
+            idx_diff = tl_wp_idx - car_wp_idx
+            # traffic light is ahead of the car within number of LOOKAHEAD_WPS
+            if idx_diff >= 0 and idx_diff <= LOOKAHEAD_WPS:
+                # minus LIGHTGAP so that the car stops near the stop line
+                light_wp_idx = tl_wp_idx - LIGHTGAP
+                light = self.lights[i]
+                #rospy.logwarn(light_wp_idx)
+                #rospy.logwarn(tl_waypoint_indices)
 
         if light:
-            #state = self.get_light_state(light)
-            state = light.state # right now the state is obtained from the groud truth
-            return light_wp_idx, state
-        self.pose = None
-        self.base_waypoints = None
-        return -1, TrafficLight.UNKNOWN
+            return light_wp_idx, light.state
+        else:
+            return -1, TrafficLight.UNKNOWN
 
     def get_traffic_light_wp_index(self, light_positions):
         indices = []
