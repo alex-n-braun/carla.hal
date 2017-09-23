@@ -28,10 +28,5 @@ class TLClassifier(object):
         processed_image = (hls_image.astype(np.float32) / 255.0) + 0.01
         final_4d = np.expand_dims(processed_image, axis=0)
 
-        network_label = self.model.predict_classes(final_4d)[0][0]
-
-        # rospy.logwarn(network_label)
-        if network_label == 1:
-            return TrafficLight.GREEN
-        else:
-            return TrafficLight.RED
+        network_label = self.model.predict(final_4d)
+        return network_label

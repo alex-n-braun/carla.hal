@@ -79,17 +79,15 @@ class WaypointUpdater(object):
                     # UPDATE WITH TRAFFIC LIGHT LOGIC
                                             
                     if(self.next_traffic_light_index > -1) and (self.next_traffic_light_index <= start + i):
+
+                        for wps in range(i):
+                            gaussian = np.exp(-((wps + 2) / ((i - start + 1) * 1.0) ** 2))
+                            self.base_waypoints[start + wps].twist.twist.linear.x = MAX_SPEED * (1 - gaussian)
+
                         target_speed = 0.0
                     else:
                         target_speed = MAX_SPEED
-                        
-                        #distance_to_tl = self.distance(self.base_waypoints[self.next_traffic_light_index].pose.pose.position, self.pose.position)
-                        
-                        #if(distance_to_tl < 5):
-                        #    target_speed = MAX_SPEED / 3.0 
-                        #if(distance_to_tl < 1) and (distance_to_tl > 0.5):
-                        #    target_speed = 0.0
-                    #rospy.logwarn("c_wp = " + str(start) + ", tl_wp = " + str(self.next_traffic_light_index))                
+
 
                     self.base_waypoints[start + i].twist.twist.linear.x = target_speed
                         

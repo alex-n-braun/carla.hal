@@ -6,17 +6,21 @@ from styx_msgs.msg import TrafficLightArray, TrafficLight
 from styx_msgs.msg import Lane
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
-from light_classification.tl_classifier import TLClassifier
 import tf
-from tf.transformations import euler_from_quaternion
 import cv2
 import yaml
 import math
 import numpy as np
+from math import sin, cos
+import keras
+from keras.models import model_from_json
+import os
+import tensorflow
 
 STATE_COUNT_THRESHOLD = 3
 LIGHTGAP = 5 # number of waypoints between the traffic light and the stop line
 LOOKAHEAD_WPS = 70 # number of wp as tl in sight
+
 
 class TLDetector(object):
     def __init__(self):
@@ -26,6 +30,11 @@ class TLDetector(object):
         self.base_waypoints = None
         self.camera_image = None
         self.lights = []
+        with open('model.json', 'r') as jfile:
+            self.model = model_from_json(jfile.read())
+        self.model.load_weights('model.h5', by_name=True)
+        self.model._make_predict_function()
+        self.graph = tensorflow.get_default_graph()
 
         self.has_image = False
 
@@ -48,7 +57,6 @@ class TLDetector(object):
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
         self.bridge = CvBridge()
-        self.light_classifier = TLClassifier()
         self.listener = tf.TransformListener()
 
         self.state = TrafficLight.UNKNOWN
@@ -104,7 +112,7 @@ class TLDetector(object):
             pose (Pose): position to match a waypoint to
 
         Returns:
-            int: index of the closest waypoint in self.waypoints
+            int: index of the closest waypoint in self.base_waypoints
 
         """
         dist = float('inf') # a very large number
@@ -115,7 +123,7 @@ class TLDetector(object):
             if dist > temp_dist:
                 dist = temp_dist
                 nearest_idx = idx
-            is_behind = is_waypoint_behind(pose, self.base_waypoints[nearest_idx])
+            is_behind = self.is_waypoint_behind(pose, self.base_waypoints[nearest_idx])
             if is_behind:
                 nearest_idx += 1
         return nearest_idx
@@ -174,15 +182,15 @@ class TLDetector(object):
             self.prev_light_loc = None
             return False
 
-        self.camera_image.encoding = "rgb8"
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
-        x, y = self.project_to_image_plane(light.pose.pose.position)
-
-        #TODO use light location to zoom in on traffic light in image
-
         #Get classification
-        return self.light_classifier.get_classification(cv_image)
+        network_label = self.get_classification(cv_image)
+        rospy.logwarn('%s', network_label)
+        if network_label >= 0.95:
+            return TrafficLight.GREEN
+        else:
+            return TrafficLight.RED
 
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
@@ -193,35 +201,34 @@ class TLDetector(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
+        light = None
 
-        # check if all necessary information is available
-        if (self.pose == None or self.base_waypoints == None):
-            return -1, TrafficLight.UNKNOWN
+        # List of positions that correspond to the line to stop in front of for a given intersection
+        stop_line_positions = self.config['stop_line_positions']
+        if self.pose and self.base_waypoints:
+            car_position = self.pose
+            closest = self.closest_node(stop_line_positions, np.array(
+                (car_position.position.x, car_position.position.y)))
 
-        light_positions = self.config['stop_line_positions']
+            rospy.logwarn('{}'.format(abs(self.lights[closest].pose.pose.position.x - car_position.position.x) +
+                    abs(self.lights[closest].pose.pose.position.y - car_position.position.y)))
+            if 5 < (abs(self.lights[closest].pose.pose.position.x - car_position.position.x) +
+                    abs(self.lights[closest].pose.pose.position.y - car_position.position.y)) < 80:
 
-        # find the waypoint index that is closest to the car
-        car_wp_idx = self.get_closest_waypoint(self.pose)
+                light_wp = self.get_closest_waypoint(self.lights[closest].pose.pose)
 
-        # find the closest visible traffic light (if one exists)
-        light_wp_idx = None
-        light = None # TrafficLight object
-
-        tl_waypoint_indices = self.get_traffic_light_wp_index(light_positions)
-        for i, tl_wp_idx in enumerate(tl_waypoint_indices):
-            idx_diff = tl_wp_idx - car_wp_idx
-            # traffic light is ahead of the car within number of LOOKAHEAD_WPS
-            if idx_diff >= 0 and idx_diff <= LOOKAHEAD_WPS:
-                # minus LIGHTGAP so that the car stops near the stop line
-                light_wp_idx = tl_wp_idx - LIGHTGAP
-                light = self.lights[i]
-                #rospy.logwarn(light_wp_idx)
-                #rospy.logwarn(tl_waypoint_indices)
+                if self.base_waypoints and len(self.base_waypoints) > closest:
+                    light_wp = self.base_waypoints[closest]
+                    light = self.lights[closest]
 
         if light:
-            return light_wp_idx, light.state
-        else:
-            return -1, TrafficLight.UNKNOWN
+            state = self.get_light_state(light)
+            if state is False:
+                self.base_waypoints = None
+                return -1, TrafficLight.UNKNOWN
+            return light_wp, state
+        self.base_waypoints = None
+        return -1, TrafficLight.UNKNOWN
 
     def get_traffic_light_wp_index(self, light_positions):
         indices = []
@@ -231,6 +238,53 @@ class TLDetector(object):
             pose.position.y = pos[1]
             indices.append(self.get_closest_waypoint(pose))
         return indices
+
+    def closest_node(self, node, nodes):
+        """paralelize finding a single closest node using numpy.
+        :param node -- numpy array with dimension rank 1 lower than nodes
+        :param nodes -- numpy convertible array of nodes"""
+        nodes = np.asarray(nodes)
+        dist_2 = np.sum((nodes - node) ** 2, axis=1)
+        return np.argmin(dist_2)
+
+    def is_waypoint_behind(self, pose, waypoint):
+        """convert to car central reference frame using yaw from tf.transformations euler coordinate transformation
+
+        :param pose --  car position PoseStamped.pose object
+        :param waypoint -- waypoint Lane object
+
+        :return bool -- True if the waypoint is behind the car False if in front
+
+        Reference:    https://answers.ros.org/question/69754/quaternion-transformations-in-python/
+        """
+        roll, pitch, yaw = tf.transformations.euler_from_quaternion([pose.orientation.x, pose.orientation.y,
+                                                  pose.orientation.z, pose.orientation.w])
+
+        shift_x = waypoint.pose.pose.position.x - pose.position.x
+        shift_y = waypoint.pose.pose.position.y - pose.position.y
+
+        x = shift_x * cos(0 - yaw) - shift_y * sin(0 - yaw)
+
+        if x > 0:
+            return False
+        return True
+
+    def get_classification(self, image):
+        """Determines the color of the traffic light in the image
+        Args:
+            image (cv::Mat): image containing the traffic light
+        Returns:
+            int: ID of traffic light color (specified in styx_msgs/TrafficLight)
+        """
+
+        resize_image = cv2.resize(image, (160, 80))
+        hls_image = cv2.cvtColor(resize_image, cv2.COLOR_BGR2HLS)
+        processed_image = (hls_image.astype(np.float32) / 255.0) + 0.01
+        final_4d = np.expand_dims(processed_image, axis=0)
+
+        network_label = self.model.predict_classes(final_4d)[0][0]
+        return network_label
+
 
 if __name__ == '__main__':
     try:
