@@ -30,16 +30,3 @@ class TLClassifier(object):
         else:
             return TrafficLight.RED
 
-
-# light_classifier = TLClassifier()
-#
-# greenimage = os.path.abspath("D:\ANN\CarND-SS\classifier_images\image-308.jpg")
-# redimage = os.path.abspath("D:\ANN\CarND-SS\classifier_images\image-1.jpg")
-#
-# greenimage = cv2.imread(greenimage)
-# redimage = cv2.imread(redimage)
-#
-# classification_green = light_classifier.get_classification(greenimage)
-# classification_red = light_classifier.get_classification(redimage)
-#
-# something = 1
