@@ -9,9 +9,11 @@ import os
 class TLClassifier(object):
     def __init__(self):
         self.c = 0
-        with open('model.json', 'r') as jfile:
+        rospy.logwarn(os.getcwd())
+        rospy.logwarn(os.path.dirname(os.path.realpath(__file__)))
+        with open('light_classification/model.json', 'r') as jfile:
             self.model = model_from_json(jfile.read())
-        self.model.load_weights('model.h5', by_name=True)
+        self.model.load_weights('light_classification/model.h5', by_name=True)
 
     def get_classification(self, image):
         """Determines the color of the traffic light in the image
