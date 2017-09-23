@@ -9,7 +9,6 @@ import tensorflow
 
 class TLClassifier(object):
     def __init__(self):
-        self.c = 0
         with open('model.json', 'r') as jfile:
             self.model = model_from_json(jfile.read())
         self.model.load_weights('model.h5', by_name=True)
@@ -24,8 +23,6 @@ class TLClassifier(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
         """
 
-        self.c += 1
-
         resize_image = cv2.resize(image, (160, 80))
         hls_image = cv2.cvtColor(resize_image, cv2.COLOR_BGR2HLS)
         processed_image = (hls_image.astype(np.float32) / 255.0) + 0.01
@@ -33,29 +30,8 @@ class TLClassifier(object):
 
         network_label = self.model.predict_classes(final_4d)[0][0]
 
-
-        # rospy.logwarn(a)
-        # if network_label == 1:
-        #     return 1
-        # else:
-        #     return 0
-
-        rospy.logwarn(network_label)
+        # rospy.logwarn(network_label)
         if network_label == 1:
             return TrafficLight.GREEN
         else:
             return TrafficLight.RED
-
-
-# light_classifier = TLClassifier()
-#
-# greenimage = os.path.abspath("D:\ANN\CarND-SS\classifier_images\image-308.jpg")
-# redimage = os.path.abspath("D:\ANN\CarND-SS\classifier_images\image-1.jpg")
-#
-# greenimage = cv2.imread(greenimage)
-# redimage = cv2.imread(redimage)
-#
-# classification_green = light_classifier.get_classification(greenimage)
-# classification_red = light_classifier.get_classification(redimage)
-#
-# something = 1
