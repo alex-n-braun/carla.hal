@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+from __future__ import print_function
+
 import rospy
 from std_msgs.msg import Int32
 from geometry_msgs.msg import PoseStamped, Pose
@@ -13,6 +15,8 @@ import cv2
 import yaml
 import math
 import numpy as np
+from keras.models import load_model
+
 
 STATE_COUNT_THRESHOLD = 3
 LIGHTGAP = 5 # number of waypoints between the traffic light and the stop line
@@ -48,7 +52,8 @@ class TLDetector(object):
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
         self.bridge = CvBridge()
-        self.light_classifier = TLClassifier()
+        model = load_model("./light_classification/model.h5")
+        self.light_classifier = TLClassifier(model)
         self.listener = tf.TransformListener()
 
         self.state = TrafficLight.UNKNOWN
@@ -173,10 +178,8 @@ class TLDetector(object):
 
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
-        x, y = self.project_to_image_plane(light.pose.pose.position)
-
-        #TODO use light location to zoom in on traffic light in image
-
+        #x, y = self.project_to_image_plane(light.pose.pose.position)
+        
         #Get classification
         return self.light_classifier.get_classification(cv_image)
 
@@ -215,7 +218,9 @@ class TLDetector(object):
                 #rospy.logwarn(tl_waypoint_indices)
 
         if light:
-            return light_wp_idx, light.state
+            state = self.get_light_state(light)
+            #rospy.logwarn(state)
+            return light_wp_idx, state#light.state
         else:
             return -1, TrafficLight.UNKNOWN
 
