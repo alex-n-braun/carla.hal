@@ -1,0 +1,8 @@
+prefix=/home/student/carla.hal/ros/devel
+
+Name: twist_controller
+Description: Description of twist_controller
+Version: 0.0.0
+Cflags: 
+Libs: -L/home/student/carla.hal/ros/devel/lib 
+Requires: 

@@ -117,7 +117,6 @@ class WaypointUpdater(object):
                     #speed_factor = self.curr_linear_velocity / MAX_SPEED
                     speed_factor = self.stop['speed_factor']
                     clv = self.stop['clv']
-                    
                     if not self.stop['stop']: #ego_dist_tl < self.min_brake_dist*speed_factor: # too close to tl to stop
                         for i in range(LOOKAHEAD_WPS):
                             idx_wp = (start+i) % len(self.base_waypoints)
@@ -153,6 +152,7 @@ class WaypointUpdater(object):
                 # [Dmitry, 11.09.2017] publish forward waypoints
                 # need to be careful at the end of the list of waypoints. Here, the list may end, and the lane will be empty.
                 self.lane.waypoints = self.base_waypoints[self.next_wp: self.next_wp + LOOKAHEAD_WPS]
+                rospy.logwarn("waypoint count: " + str(len(self.lane.waypoints)))
                 self.final_waypoints_pub.publish(self.lane)
             
             else:

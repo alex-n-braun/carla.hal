@@ -1,0 +1,8 @@
+prefix=/home/student/carla.hal/ros/devel
+
+Name: styx_msgs
+Description: Description of styx_msgs
+Version: 0.0.0
+Cflags: -I/home/student/carla.hal/ros/devel/include
+Libs: -L/home/student/carla.hal/ros/devel/lib 
+Requires: 

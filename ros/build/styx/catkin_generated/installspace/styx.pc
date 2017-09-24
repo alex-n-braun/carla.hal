@@ -1,0 +1,8 @@
+prefix=/home/student/carla.hal/ros/install
+
+Name: styx
+Description: Description of styx
+Version: 0.0.0
+Cflags: 
+Libs: -L/home/student/carla.hal/ros/install/lib 
+Requires: 

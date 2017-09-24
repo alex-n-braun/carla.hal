@@ -1,0 +1,8 @@
+prefix=/home/student/carla.hal/ros/devel
+
+Name: camera_info_publisher
+Description: Description of camera_info_publisher
+Version: 0.0.0
+Cflags: 
+Libs: -L/home/student/carla.hal/ros/devel/lib 
+Requires: 

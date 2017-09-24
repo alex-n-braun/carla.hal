@@ -40,8 +40,10 @@ class TLClassifier(object):
 
         # rospy.logwarn(a)
         if network_label == 1:
+	    rospy.logwarn("classified light: GREEN")
             return TrafficLight.GREEN
         else:
+	    rospy.logwarn("classified light: RED")
             return TrafficLight.RED
 
 
