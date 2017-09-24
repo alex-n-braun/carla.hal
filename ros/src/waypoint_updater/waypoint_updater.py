@@ -3,6 +3,7 @@
 import rospy
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from styx_msgs.msg import Lane, Waypoint, TrafficLight, TrafficLightArray
+from std_msgs.msg import Bool
 from std_msgs.msg import Int32
 
 import math
@@ -45,11 +46,13 @@ class WaypointUpdater(object):
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb, queue_size=1)
         rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
         rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb, queue_size=1)
+        rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb, queue_size=1)
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
         # TODO: Add other member variables you need below
+        self.dbw_enabled = False
         self.pose = None            # car current position to estimate respective forward waypoints
         self.lane = Lane()          # lane object, which we use to publish forward waypoints
         self.base_waypoints = None  # waypoints from the map
@@ -95,12 +98,16 @@ class WaypointUpdater(object):
                 start = int(self.next_wp)
                 #rospy.logwarn(str(start))
 
-                if(self.next_traffic_light_index > -1 and start-1 <= self.next_traffic_light_index):
+                if(self.next_traffic_light_index > -1):
+                    if not self.dbw_enabled:
+                        self.stop={}
+                        
                     if self.stop=={}:
                         self.stop['ego_dist_tl'] = self.distance(self.pose.position, 
                                                                  self.base_waypoints[self.next_traffic_light_index].pose.pose.position)
                         self.stop['speed_factor'] = self.curr_linear_velocity / MAX_SPEED
                         self.stop['clv'] = self.curr_linear_velocity
+                        self.stop['stop'] = self.stop['ego_dist_tl'] >= self.min_brake_dist * self.stop['speed_factor']
                     
                     #ego_dist_tl = self.distance(self.pose.position, 
                     #                            self.base_waypoints[self.next_traffic_light_index].pose.pose.position)
@@ -111,7 +118,7 @@ class WaypointUpdater(object):
                     speed_factor = self.stop['speed_factor']
                     clv = self.stop['clv']
                     
-                    if ego_dist_tl < self.min_brake_dist*speed_factor:
+                    if not self.stop['stop']: #ego_dist_tl < self.min_brake_dist*speed_factor: # too close to tl to stop
                         for i in range(LOOKAHEAD_WPS):
                             idx_wp = (start+i) % len(self.base_waypoints)
                             self.base_waypoints[idx_wp].twist.twist.linear.x = MAX_SPEED
@@ -131,6 +138,7 @@ class WaypointUpdater(object):
                                                     self.base_waypoints[self.next_traffic_light_index].pose.pose.position)
                             if dist_tl > self.brake_dist*speed_factor:
                                 goal_speed = MAX_SPEED
+                                self.stop['speed_factor'] = self.curr_linear_velocity / MAX_SPEED
                             else:
                                 goal_speed = dist_tl / self.brake_dist * clv
                                 goal_speed = goal_speed if goal_speed>0.0 else 0.0
@@ -141,25 +149,7 @@ class WaypointUpdater(object):
                     for i in range(LOOKAHEAD_WPS):
                         idx_wp = (start+i) % len(self.base_waypoints)
                         self.base_waypoints[idx_wp].twist.twist.linear.x = MAX_SPEED
-                                
-
-#                for i in range(LOOKAHEAD_WPS):
-#                    # UPDATE WITH TRAFFIC LIGHT LOGIC
-#                    idx_wp = (start+i) % len(self.base_waypoints)
-#                    
-#                    wp = self.base_waypoints[idx_wp]
-#                    dist = self.distance(self.pose.position, wp.pose.pose.position)
-#                                            
-##                    if(self.next_traffic_light_index > -1) and (self.next_traffic_light_index <= start + i):
-#                    if(self.next_traffic_light_index > -1):
-#                        if 
-#                        dist_tl = self.distance(wp.pose.pose.position, self.next_traffic_light_index
-#                        target_speed = 0.0
-#                    else:
-#                        target_speed = MAX_SPEED
-#                        
-#                    self.base_waypoints[idx_wp].twist.twist.linear.x = target_speed
-                        
+                                                        
                 # [Dmitry, 11.09.2017] publish forward waypoints
                 # need to be careful at the end of the list of waypoints. Here, the list may end, and the lane will be empty.
                 self.lane.waypoints = self.base_waypoints[self.next_wp: self.next_wp + LOOKAHEAD_WPS]
@@ -169,6 +159,15 @@ class WaypointUpdater(object):
                 rospy.logwarn("---- waypoint_updater: no data!! ----")
                 
             rate.sleep()
+
+    def dbw_enabled_cb(self, msg):
+
+        if (msg.data == True):
+
+            self.dbw_enabled = True
+        else:
+            self.dbw_enabled = False
+
             
     def pose_cb(self, msg):
         # TODO: Implement - pose callback will be called to get the next waypoints
