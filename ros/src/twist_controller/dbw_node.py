@@ -118,13 +118,14 @@ class DBWNode(object):
             #    rospy.logwarn("speed = "+str(des_linear_velocity))
 
             if self.dbw_enabled:
+                #self.controller.reload_params()
                 throttle, brake, steering = self.controller.control(
                     self.delta_t, self.des_linear_velocity, self.des_angular_velocity,
                     self.curr_linear_velocity)
 
                 self.publish(throttle, brake, steering)
             else:
-                pass
+                self.controller.init(self.curr_linear_velocity)
 
             rate.sleep()
             # counter = counter + 1 # just for testing throttle _AND_ brake

@@ -11,19 +11,21 @@ class PID(object):
         self.min = mn
         self.max = mx
 
-        self.int_val = self.last_int_val = self.last_error = 0.
+        self.int_val = 0.
+        self.last_error = None
 
     def reset(self):
         self.int_val = 0.0
-        self.last_int_val = 0.0
+        self.last_error = None
 
     def step(self, error, sample_time):
-        self.last_int_val = self.int_val
+        integral = self.int_val + error * sample_time * self.ki;
+        if self.last_error:
+            derivative = (error - self.last_error) / sample_time;
+        else:
+            derivative = 0.0
 
-        integral = self.int_val + error * sample_time;
-        derivative = (error - self.last_error) / sample_time;
-
-        y = self.kp * error + self.ki * self.int_val + self.kd * derivative;
+        y = self.kp * error + self.int_val + self.kd * derivative;
         val = max(self.min, min(y, self.max))
 
         if val > self.max:
@@ -35,3 +37,14 @@ class PID(object):
         self.last_error = error
 
         return val
+    
+    def get_state(self):
+        return [self.int_val, self.last_error]
+    
+    def set_params(self, kp, ki, kd, mn=MIN_NUM, mx=MAX_NUM):
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+        self.min = mn
+        self.max = mx
+        
