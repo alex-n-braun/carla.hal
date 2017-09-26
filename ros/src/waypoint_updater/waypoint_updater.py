@@ -157,9 +157,9 @@ class WaypointUpdater(object):
                                                         
                 # [Dmitry, 11.09.2017] publish forward waypoints
                 # need to be careful at the end of the list of waypoints. Here, the list may end, and the lane will be empty.
-                if (start + LOOKAHEAD_WPS >= loop_length):
+                if (start + LOOKAHEAD_WPS > loop_length):
                     end_part = self.base_waypoints[start: loop_length]
-                    start_part = self.base_waypoints[: LOOKAHEAD_WPS + loop_length - start]
+                    start_part = self.base_waypoints[: LOOKAHEAD_WPS - (loop_length - start)]
                     self.lane.waypoints = end_part + start_part
                 else:
                     self.lane.waypoints = self.base_waypoints[start: start + LOOKAHEAD_WPS]
