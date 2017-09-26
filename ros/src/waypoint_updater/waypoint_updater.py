@@ -81,7 +81,7 @@ class WaypointUpdater(object):
    
     def loop(self):
         
-        rate = rospy.Rate(10)       # setting refresh rate in Hz
+        rate = rospy.Rate(35)       # setting refresh rate in Hz
         self.reload_params()
         
         while not rospy.is_shutdown():
@@ -143,6 +143,7 @@ class WaypointUpdater(object):
                             if dist_tl > self.brake_dist*speed_factor:
                                 goal_speed = MAX_SPEED
                                 self.stop['speed_factor'] = self.curr_linear_velocity / MAX_SPEED
+                                self.stop['clv'] = self.curr_linear_velocity
                             else:
                                 goal_speed = dist_tl / self.brake_dist * clv
                                 goal_speed = goal_speed if goal_speed > 0.0 else 0.0
