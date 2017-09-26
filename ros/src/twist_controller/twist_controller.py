@@ -13,7 +13,7 @@ class Controller(object):
     def __init__(self, yaw_controller, p_brake):
         # TODO: Implement
         # defining 2 PID controllers
-        self.throttle_pid = PID(kp=0.4, ki=0.02, kd=0.1, mn=-1.0, mx=1.0)
+        self.throttle_pid = PID(kp=0.4, ki=0.02, kd=0.7, mn=-1.0, mx=1.0)
         self.brake_pid = PID(kp=p_brake, ki=0.0, kd=0.0, mn=0.0, mx=100000.)
         self.yaw_controller = yaw_controller
         self.des_speed_filter = LowPassFilter2(1.5, 0.) 
