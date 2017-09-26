@@ -31,9 +31,6 @@ MAX_SPEED = 10.0 * MPH_TO_MPS #: Vehicle speed limit
 
 LOOKAHEAD_WPS = 200  # Number of waypoints we will publish. You can change this number
 
-LOOKAHEAD_WPS = 300 # Number of waypoints we will publish. You can change this number
-#LOOKBACK_WPS = 10 # Number of waypoints to keep in the back for interpolation
-
 
 class WaypointUpdater(object):
     def __init__(self):
@@ -85,6 +82,8 @@ class WaypointUpdater(object):
 
                         for wps in range(i - start):
                             current = self.base_waypoints[start + wps].twist.twist.linear.x
+                            if not current:
+                                current = MAX_SPEED
                             gaussian = np.exp(-((wps + 1) / ((i - start + 1) * 1.0)) ** 2)
                             self.base_waypoints[start + wps].twist.twist.linear.x = current * (1 - gaussian)
 
@@ -93,6 +92,7 @@ class WaypointUpdater(object):
                         target_speed = MAX_SPEED
 
                     self.base_waypoints[start + i].twist.twist.linear.x = target_speed
+
 
                 # [Dmitry, 11.09.2017] publish forward waypoints
                 # need to be careful at the end of the list of waypoints. Here, the list may end, and the lane will be empty.
@@ -140,7 +140,6 @@ class WaypointUpdater(object):
 
 
     def waypoints_cb(self, msg):
-        # TODO: Implement
         # [Dmitry, 17.09.2017]
         if (self.base_waypoints != msg.waypoints):
             # if we got the new waypoints
@@ -149,7 +148,6 @@ class WaypointUpdater(object):
             self.next_wp = None
 
     def traffic_cb(self, msg):
-        # TODO: Callback for /traffic_waypoint message. Implement
         if (self.pose is None):
             return
 
@@ -157,7 +155,6 @@ class WaypointUpdater(object):
 
 
     def obstacle_cb(self, msg):
-        # TODO: Callback for /obstacle_waypoint message. We will implement it later
         pass
 
     def get_waypoint_velocity(self, waypoint):
