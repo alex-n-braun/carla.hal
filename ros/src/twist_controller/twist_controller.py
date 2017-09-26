@@ -21,7 +21,7 @@ class Controller(object):
         self.throttle_direct = 0.0
         self.standstill_velocity = 0.01
         self.standstill_brake = -2.0*p_brake*self.throttle_brake_offs
-        self.standstill_filter_time = 1.0
+        self.standstill_filter_time = 0.75
         self.standstill_filter = LowPassFilter2(self.standstill_filter_time, 0.0)
         # take 2 secs to reach max speed, init speed = 0.
 
@@ -39,12 +39,12 @@ class Controller(object):
         if throttle_ < 0.0:
             throttle_ = 0.0
         
-        brake_ = self.brake_pid.step(-lin_vel_err, delta_time)
+        brake_ = self.brake_pid.step(-(lin_vel_err-self.throttle_brake_offs), delta_time)
         #rospy.logwarn(self.throttle_pid.get_state())
         
         if lin_vel_err > self.throttle_brake_offs:
             #self.brake_pid.reset()
-            if linear_velocity < self.standstill_velocity:
+            if linear_velocity < self.standstill_velocity and lin_vel_err < 0.0:
                 brake_ = self.standstill_filter.filt(self.standstill_brake, delta_time)
                 throttle_ = 0.
                 self.throttle_pid.reset()
