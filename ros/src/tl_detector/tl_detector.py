@@ -35,6 +35,9 @@ class TLDetector(object):
         self.last_state = TrafficLight.UNKNOWN
         self.last_wp = -1
         self.state_count = 0
+        
+        model = load_model("./light_classification/model.h5")
+        self.light_classifier = TLClassifier(model)
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -55,13 +58,6 @@ class TLDetector(object):
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
         self.bridge = CvBridge()
-        json_file = open('./light_classification/model.json', 'r')
-        loaded_model_json = json_file.read()
-        json_file.close()
-        model = model_from_json(loaded_model_json)
-        model.load_weights("./light_classification/model.h5")
-
-        self.light_classifier = TLClassifier(model)
         self.listener = tf.TransformListener()
 
         rospy.spin()
