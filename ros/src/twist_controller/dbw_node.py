@@ -69,13 +69,6 @@ class DBWNode(object):
         # min_speed = 0.001: in YawController.get_angle, it is divided by a radius that is 
         # proportional to current speed. To avoid division by zero, we need a minimum speed.
 
-        # TODO: Subscribe to all the topics you need to
-
-        rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb, queue_size=1)
-
-        rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb, queue_size=1)
-        rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cmd_cb, queue_size=1)
-
         # Some important variables:
         self.dbw_enabled = False
         self.curr_linear_velocity = 0.0
@@ -88,6 +81,14 @@ class DBWNode(object):
         self.vel_cur = 0.0
 
         self.delta_t = 0.0
+
+        # TODO: Subscribe to all the topics you need to
+
+        rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb, queue_size=1)
+
+        rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb, queue_size=1)
+        rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cmd_cb, queue_size=1)
+        
         self.loop()
 
     def loop(self):
@@ -118,13 +119,14 @@ class DBWNode(object):
             #    rospy.logwarn("speed = "+str(des_linear_velocity))
 
             if self.dbw_enabled:
+                #self.controller.reload_params()
                 throttle, brake, steering = self.controller.control(
                     self.delta_t, self.des_linear_velocity, self.des_angular_velocity,
                     self.curr_linear_velocity)
 
                 self.publish(throttle, brake, steering)
             else:
-                pass
+                self.controller.init(self.curr_linear_velocity)
 
             rate.sleep()
             # counter = counter + 1 # just for testing throttle _AND_ brake
