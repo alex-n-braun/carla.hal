@@ -155,6 +155,17 @@ class WaypointUpdater(object):
                         idx_wp = (start+i) % len(self.base_waypoints)
                         self.base_waypoints[idx_wp].twist.twist.linear.x = MAX_SPEED
                                                         
+                # decrease speed to zero at the end of the track. 
+                if start + LOOKAHEAD_WPS > loop_length:
+                    rospy.logwarn('I can see the end')
+                    last_wp = self.base_waypoints[-1]
+                    last_wp.twist.twist.linear.x = 0.
+                    for wp in self.base_waypoints[:-1][::-1]:
+                        dist = self.distance(wp.pose.pose.position, last_wp.pose.pose.position)
+                        end_speed = dist / self.brake_dist * MAX_SPEED - 1.0
+                        end_speed = max(0.0, min(wp.twist.twist.linear.x, end_speed))
+                        wp.twist.twist.linear.x = end_speed
+                
                 # [Dmitry, 11.09.2017] publish forward waypoints
                 # need to be careful at the end of the list of waypoints. Here, the list may end, and the lane will be empty.
                 if (start + LOOKAHEAD_WPS > loop_length):
