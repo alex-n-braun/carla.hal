@@ -32,8 +32,8 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 MPH_TO_MPS = 0.44704
 MAX_SPEED = 10.0 * MPH_TO_MPS #: Vehicle speed limit
 
-BRAKE_DIST = 20 # meters; distance to brake from MAX_SPEED to 0
-MIN_BRAKE_DIST = 2 # meters; min distance to brake from MAX_SPEED to 0; if closer, go ahead
+BRAKE_DIST = 20.0 # meters; distance to brake from MAX_SPEED to 0
+MIN_BRAKE_DIST = 2.0 # meters; min distance to brake from MAX_SPEED to 0; if closer, go ahead
 
 LOOKAHEAD_WPS = 300 # Number of waypoints we will publish. You can change this number
 #LOOKBACK_WPS = 10 # Number of waypoints to keep in the back for interpolation
@@ -82,7 +82,7 @@ class WaypointUpdater(object):
     def loop(self):
         
         rate = rospy.Rate(35)       # setting refresh rate in Hz
-        self.reload_params()
+        #self.reload_params()
         
         while not rospy.is_shutdown():
             
@@ -157,9 +157,9 @@ class WaypointUpdater(object):
                                                         
                 # [Dmitry, 11.09.2017] publish forward waypoints
                 # need to be careful at the end of the list of waypoints. Here, the list may end, and the lane will be empty.
-                if (start + LOOKAHEAD_WPS >= loop_length):
+                if (start + LOOKAHEAD_WPS > loop_length):
                     end_part = self.base_waypoints[start: loop_length]
-                    start_part = self.base_waypoints[: LOOKAHEAD_WPS + loop_length - start]
+                    start_part = self.base_waypoints[: LOOKAHEAD_WPS - (loop_length - start)]
                     self.lane.waypoints = end_part + start_part
                 else:
                     self.lane.waypoints = self.base_waypoints[start: start + LOOKAHEAD_WPS]
