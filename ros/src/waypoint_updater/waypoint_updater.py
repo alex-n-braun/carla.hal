@@ -162,7 +162,7 @@ class WaypointUpdater(object):
                     last_wp.twist.twist.linear.x = 0.
                     for wp in self.base_waypoints[:-1][::-1]:
                         dist = self.distance(wp.pose.pose.position, last_wp.pose.pose.position)
-                        end_speed = dist / self.brake_dist * MAX_SPEED - 1.0
+                        end_speed = (dist - 10.0) / self.brake_dist * MAX_SPEED
                         end_speed = max(0.0, min(wp.twist.twist.linear.x, end_speed))
                         wp.twist.twist.linear.x = end_speed
                 
