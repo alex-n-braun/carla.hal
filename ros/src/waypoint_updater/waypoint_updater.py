@@ -135,6 +135,15 @@ class WaypointUpdater(object):
                             goal_speed = goal_speed if goal_speed>0.0 else 0.0
                             goal_speed = clv if goal_speed > clv else goal_speed
                             self.base_waypoints[idx_wp].twist.twist.linear.x = goal_speed
+                        # check for increasing speed
+                        for i in range(1, LOOKAHEAD_WPS):
+                            idx_wp1 = (start+i) % len(self.base_waypoints)
+                            idx_wp0 = (start+i-1) % len(self.base_waypoints)
+                            vel1 = self.base_waypoints[idx_wp1].twist.twist.linear.x 
+                            vel0 = self.base_waypoints[idx_wp0].twist.twist.linear.x 
+                            if vel1>vel0:
+                                self.base_waypoints[idx_wp1].twist.twist.linear.x = 0.0
+                                self.base_waypoints[idx_wp0].twist.twist.linear.x = 0.0
                     else:
                         for i in range(LOOKAHEAD_WPS):
                             idx_wp = (start+i) % len(self.base_waypoints)
@@ -157,21 +166,21 @@ class WaypointUpdater(object):
                                                         
                 # decrease speed to zero at the end of the track. 
                 if start + LOOKAHEAD_WPS > loop_length:
-                    rospy.logwarn('I can see the end')
+                    #rospy.logwarn('I can see the end')
                     last_wp = self.base_waypoints[-1]
                     last_wp.twist.twist.linear.x = 0.
-                    for wp in self.base_waypoints[:-1][::-1]:
-                        dist = self.distance(wp.pose.pose.position, last_wp.pose.pose.position)
+                    for idx_wp in range(start, loop_length):
+                        dist = self.distance(self.base_waypoints[idx_wp].pose.pose.position, last_wp.pose.pose.position)
                         end_speed = (dist - 10.0) / self.brake_dist * MAX_SPEED
-                        end_speed = max(0.0, min(wp.twist.twist.linear.x, end_speed))
-                        wp.twist.twist.linear.x = end_speed
-                
+                        end_speed = max(0.0, min(self.base_waypoints[idx_wp].twist.twist.linear.x, end_speed))
+                        self.base_waypoints[idx_wp].twist.twist.linear.x = end_speed
+                                        
                 # [Dmitry, 11.09.2017] publish forward waypoints
                 # need to be careful at the end of the list of waypoints. Here, the list may end, and the lane will be empty.
                 if (start + LOOKAHEAD_WPS > loop_length):
                     end_part = self.base_waypoints[start: loop_length]
                     start_part = self.base_waypoints[: LOOKAHEAD_WPS - (loop_length - start)]
-                    self.lane.waypoints = end_part + start_part
+                    self.lane.waypoints = end_part # + start_part
                 else:
                     self.lane.waypoints = self.base_waypoints[start: start + LOOKAHEAD_WPS]
                 
