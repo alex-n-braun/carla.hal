@@ -16,7 +16,7 @@ class Controller(object):
         self.throttle_pid = PID(kp=0.4, ki=0.02, kd=0.1, mn=-1.0, mx=1.0)
         self.brake_pid = PID(kp=p_brake, ki=0.0, kd=0.0, mn=0.0, mx=100000.)
         self.yaw_controller = yaw_controller
-        self.des_speed_filter = LowPassFilter2(1.5, 0.) 
+        self.des_speed_filter = LowPassFilter2(0.75, 0.) 
         self.throttle_brake_offs = -1.0
         self.throttle_direct = 0.0
         self.standstill_velocity = 0.01
