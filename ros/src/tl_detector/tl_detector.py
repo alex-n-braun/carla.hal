@@ -17,8 +17,8 @@ from keras.models import load_model
 
 
 STATE_COUNT_THRESHOLD = 3
-LIGHTGAP = 5 # number of waypoints between the traffic light and the stop line
-LOOKAHEAD_WPS = 70 # number of wp as tl in sight
+#LIGHTGAP = 5 # number of waypoints between the traffic light and the stop line
+#LOOKAHEAD_WPS = 70 # number of wp as tl in sight
 
 class TLDetector(object):
     def __init__(self):
@@ -207,14 +207,21 @@ class TLDetector(object):
 
         tl_waypoint_indices = self.get_traffic_light_wp_index(light_positions)
         for i, tl_wp_idx in enumerate(tl_waypoint_indices):
-            idx_diff = tl_wp_idx - car_wp_idx
+            
+            tl_wp = self.base_waypoints[tl_wp_idx]
+            dist = self.distance(tl_wp, self.pose)
+            
+            #idx_diff = tl_wp_idx - car_wp_idx
+            
             # traffic light is ahead of the car within number of LOOKAHEAD_WPS
-            if idx_diff >= 0 and idx_diff <= LOOKAHEAD_WPS:
+            if self.isAhead(tl_wp) and dist < 15.: #idx_diff <= LOOKAHEAD_WPS:
                 # minus LIGHTGAP so that the car stops near the stop line
-                light_wp_idx = tl_wp_idx - LIGHTGAP
+                light_wp_idx = tl_wp_idx #- LIGHTGAP
                 light = self.lights[i]
+                #rospy.logwarn(dist)
+                #rospy.logwarn(self.isAhead(tl_wp))
                 #rospy.logwarn(light_wp_idx)
-                #rospy.logwarn(tl_waypoint_indices)
+                #rospy.logwarn(car_wp_idx)
 
         if light:
             state = self.get_light_state(light)
@@ -222,6 +229,20 @@ class TLDetector(object):
             return light_wp_idx, state#light.state
         else:
             return -1, TrafficLight.UNKNOWN
+
+    def isAhead(self, waypoint):
+        dx = waypoint.pose.pose.position.x - self.pose.position.x
+        dy = waypoint.pose.pose.position.y - self.pose.position.y
+
+        _, _, yaw = euler_from_quaternion((self.pose.orientation.x,
+                                           self.pose.orientation.y,
+                                           self.pose.orientation.z,
+                                           self.pose.orientation.w))
+        x_tl = dx * np.cos(yaw) + dy * np.sin(yaw)
+        if x_tl > 0:
+            return True
+        else:
+            return False
 
     def get_traffic_light_wp_index(self, light_positions):
         indices = []
