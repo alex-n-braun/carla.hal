@@ -18,7 +18,7 @@ from keras.models import load_model
 
 STATE_COUNT_THRESHOLD = 3
 #LIGHTGAP = 5 # number of waypoints between the traffic light and the stop line
-#LOOKAHEAD_WPS = 70 # number of wp as tl in sight
+LOOKAHEAD_DIST = 15 # distance as tl in sight
 
 class TLDetector(object):
     def __init__(self):
@@ -214,7 +214,7 @@ class TLDetector(object):
             #idx_diff = tl_wp_idx - car_wp_idx
             
             # traffic light is ahead of the car within number of LOOKAHEAD_WPS
-            if self.isAhead(tl_wp) and dist < 15.: #idx_diff <= LOOKAHEAD_WPS:
+            if self.isAhead(tl_wp) and dist < LOOKAHEAD_DIST: #idx_diff <= LOOKAHEAD_WPS:
                 # minus LIGHTGAP so that the car stops near the stop line
                 light_wp_idx = tl_wp_idx #- LIGHTGAP
                 light = self.lights[i]
