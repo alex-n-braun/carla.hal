@@ -30,7 +30,7 @@ as well as to verify your TL classifier.
 TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 MPH_TO_MPS = 0.44704
-MAX_SPEED = 10.0 * MPH_TO_MPS #: Vehicle speed limit
+#MAX_SPEED = 10.0 * MPH_TO_MPS #: Vehicle speed limit
 
 BRAKE_DIST = 20.0 # meters; distance to brake from MAX_SPEED to 0
 MIN_BRAKE_DIST = 2.0 # meters; min distance to brake from MAX_SPEED to 0; if closer, go ahead
@@ -61,6 +61,8 @@ class WaypointUpdater(object):
         
         self.stop={}
         
+        self.MAX_SPEED = 0.0
+        
 
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb, queue_size=1)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb, queue_size=1)
@@ -86,6 +88,11 @@ class WaypointUpdater(object):
         
         while not rospy.is_shutdown():
             
+            MAX_SPEED = rospy.get_param('waypoint_loader/velocity')/3.6 # km/h to m/s
+            if not MAX_SPEED == self.MAX_SPEED:
+                self.MAX_SPEED = MAX_SPEED
+                rospy.logwarn("set maximum velocity to "+str(MAX_SPEED))
+            
             if (self.base_waypoints is not None) and (self.pose is not None) and (self.next_wp is not None):
                 # [Dmitry, 11.09.2017] - let's determine where we are and where are we heading                
                 # identify the closest waypoint in front of the car
@@ -109,7 +116,7 @@ class WaypointUpdater(object):
                     if self.stop=={}:
                         self.stop['ego_dist_tl'] = self.distance(self.pose.position, 
                                                                  self.base_waypoints[self.next_traffic_light_index].pose.pose.position)
-                        self.stop['speed_factor'] = self.curr_linear_velocity / MAX_SPEED
+                        self.stop['speed_factor'] = self.curr_linear_velocity / self.MAX_SPEED
                         self.stop['clv'] = self.curr_linear_velocity
                         self.stop['stop'] = self.stop['ego_dist_tl'] >= self.min_brake_dist * self.stop['speed_factor']
                     
@@ -125,7 +132,7 @@ class WaypointUpdater(object):
                     if not self.stop['stop']: #ego_dist_tl < self.min_brake_dist*speed_factor: # too close to tl to stop
                         for i in range(LOOKAHEAD_WPS):
                             idx_wp = (start+i) % len(self.base_waypoints)
-                            self.base_waypoints[idx_wp].twist.twist.linear.x = MAX_SPEED
+                            self.base_waypoints[idx_wp].twist.twist.linear.x = self.MAX_SPEED
                     elif ego_dist_tl < self.brake_dist*speed_factor:
                         for i in range(LOOKAHEAD_WPS):
                             idx_wp = (start+i) % len(self.base_waypoints)
@@ -150,8 +157,8 @@ class WaypointUpdater(object):
                             dist_tl = self.distance(self.base_waypoints[idx_wp].pose.pose.position,
                                                     self.base_waypoints[self.next_traffic_light_index].pose.pose.position)
                             if dist_tl > self.brake_dist*speed_factor:
-                                goal_speed = MAX_SPEED
-                                self.stop['speed_factor'] = self.curr_linear_velocity / MAX_SPEED
+                                goal_speed = self.MAX_SPEED
+                                self.stop['speed_factor'] = self.curr_linear_velocity / self.MAX_SPEED
                                 self.stop['clv'] = self.curr_linear_velocity
                             else:
                                 goal_speed = dist_tl / self.brake_dist * clv
@@ -162,7 +169,7 @@ class WaypointUpdater(object):
                     self.stop={}
                     for i in range(LOOKAHEAD_WPS):
                         idx_wp = (start+i) % len(self.base_waypoints)
-                        self.base_waypoints[idx_wp].twist.twist.linear.x = MAX_SPEED
+                        self.base_waypoints[idx_wp].twist.twist.linear.x = self.MAX_SPEED
                                                         
                 # decrease speed to zero at the end of the track. 
                 if start + LOOKAHEAD_WPS > loop_length:
@@ -171,7 +178,7 @@ class WaypointUpdater(object):
                     last_wp.twist.twist.linear.x = 0.
                     for idx_wp in range(start, loop_length):
                         dist = self.distance(self.base_waypoints[idx_wp].pose.pose.position, last_wp.pose.pose.position)
-                        end_speed = (dist - 10.0) / self.brake_dist * MAX_SPEED
+                        end_speed = (dist - 10.0) / self.brake_dist * self.MAX_SPEED
                         end_speed = max(0.0, min(self.base_waypoints[idx_wp].twist.twist.linear.x, end_speed))
                         self.base_waypoints[idx_wp].twist.twist.linear.x = end_speed
                                         
