@@ -23,10 +23,8 @@ class TLClassifier(object):
         resize_image = np.expand_dims(resize_image / 255., axis=0)
         network_label = np.argmax(self.model.predict(resize_image, batch_size=1)[0])
         #rospy.logwarn(self.model.predict(resize_image))
-        if network_label == 2:
-            return TrafficLight.GREEN
-        elif network_label == 1:
-            return TrafficLight.YELLOW
-        else:
+        if network_label == 0:
             return TrafficLight.RED
+        else:
+            return TrafficLight.GREEN
 
