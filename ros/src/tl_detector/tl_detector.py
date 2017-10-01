@@ -18,7 +18,7 @@ from keras.models import load_model
 
 STATE_COUNT_THRESHOLD = 3
 #LIGHTGAP = 5 # number of waypoints between the traffic light and the stop line
-LOOKAHEAD_DIST = 15 # distance as tl in sight
+LOOKAHEAD_DIST = 61 # distance as tl in sight
 
 class TLDetector(object):
     def __init__(self):

@@ -215,7 +215,10 @@ class WaypointUpdater(object):
         #current_time = rospy.get_rostime()
         
         if (self.base_waypoints) and (self.pose):
-            self.next_wp = int(self.closest_waypoint(self.pose, self.base_waypoints))
+            next_wp = int(self.closest_waypoint(self.pose, self.base_waypoints))
+            if next_wp!=self.next_wp:
+                self.next_wp = next_wp
+                #rospy.logwarn("Next waypoint: "+str(next_wp))
         self.last_timestamp = rospy.get_rostime()
         
     def current_velocity_cb(self, message):
@@ -260,7 +263,10 @@ class WaypointUpdater(object):
         if (self.pose is None):
             return
         
-        self.next_traffic_light_index = int(msg.data)
+        next_traffic_light_index = int(msg.data)
+        if next_traffic_light_index!=self.next_traffic_light_index:
+            self.next_traffic_light_index = next_traffic_light_index
+            rospy.logwarn("next red traffic light: "+str(self.next_traffic_light_index))
         
 
     def obstacle_cb(self, msg):
