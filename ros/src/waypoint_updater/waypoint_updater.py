@@ -157,7 +157,7 @@ class WaypointUpdater(object):
                             idx_wp = (start+i) % len(self.base_waypoints)
                             dist_tl = self.distance(self.base_waypoints[idx_wp].pose.pose.position,
                                                     self.base_waypoints[self.next_traffic_light_index].pose.pose.position)
-                            if dist_tl > self.brake_dist*speed_factor + STOP_DIST:
+                            if dist_tl >= self.brake_dist*speed_factor + STOP_DIST:
                                 goal_speed = self.MAX_SPEED
                                 self.stop['speed_factor'] = (self.curr_linear_velocity / NORM_SPEED)**2.0
                                 self.stop['clv'] = self.curr_linear_velocity
