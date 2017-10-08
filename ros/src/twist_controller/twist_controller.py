@@ -19,7 +19,7 @@ class Controller(object):
         self.des_speed_filter = LowPassFilter2(0.75, 0.) 
         self.throttle_brake_offs = -1.0
         self.throttle_direct = 0.0
-        self.standstill_velocity = 1.0
+        self.standstill_velocity = 0.01
         self.standstill_brake = -2.0*p_brake*self.throttle_brake_offs
         self.standstill_filter_time = 1.0
         self.standstill_filter = LowPassFilter2(self.standstill_filter_time, 0.0)

@@ -30,10 +30,11 @@ as well as to verify your TL classifier.
 TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 MPH_TO_MPS = 0.44704
-#MAX_SPEED = 10.0 * MPH_TO_MPS #: Vehicle speed limit
+NORM_SPEED = 10.0 * MPH_TO_MPS #: Vehicle speed limit
 
-BRAKE_DIST = 20.0 # meters; distance to brake from MAX_SPEED to 0
+STOP_DIST = 3.0 # meters; stop this distance before stop line
 MIN_BRAKE_DIST = 2.0 # meters; min distance to brake from MAX_SPEED to 0; if closer, go ahead
+BRAKE_DIST = 18.0+MIN_BRAKE_DIST # meters; distance to brake from MAX_SPEED to 0 (at NORM_SPEED)
 
 LOOKAHEAD_WPS = 300 # Number of waypoints we will publish. You can change this number
 #LOOKBACK_WPS = 10 # Number of waypoints to keep in the back for interpolation
@@ -110,15 +111,15 @@ class WaypointUpdater(object):
                 start_part = (start + LOOKAHEAD_WPS) % loop_length
 
                 if (self.next_traffic_light_index > -1) and ((start <= self.next_traffic_light_index <= end_part) or (self.next_traffic_light_index <= start_part)):
-                    if not self.dbw_enabled:
-                        self.stop={}
+                    #if not self.dbw_enabled:
+                    #    self.stop={}
                         
                     if self.stop=={}:
                         self.stop['ego_dist_tl'] = self.distance(self.pose.position, 
                                                                  self.base_waypoints[self.next_traffic_light_index].pose.pose.position)
-                        self.stop['speed_factor'] = self.curr_linear_velocity / self.MAX_SPEED
+                        self.stop['speed_factor'] = (self.curr_linear_velocity / NORM_SPEED)**2.0
                         self.stop['clv'] = self.curr_linear_velocity
-                        self.stop['stop'] = self.stop['ego_dist_tl'] >= self.min_brake_dist * self.stop['speed_factor']
+                        self.stop['stop'] = self.stop['ego_dist_tl'] >= (self.min_brake_dist) * self.stop['speed_factor'] 
                     
                     #ego_dist_tl = self.distance(self.pose.position, 
                     #                            self.base_waypoints[self.next_traffic_light_index].pose.pose.position)
@@ -133,12 +134,12 @@ class WaypointUpdater(object):
                         for i in range(LOOKAHEAD_WPS):
                             idx_wp = (start+i) % len(self.base_waypoints)
                             self.base_waypoints[idx_wp].twist.twist.linear.x = self.MAX_SPEED
-                    elif ego_dist_tl < self.brake_dist*speed_factor:
+                    elif ego_dist_tl < self.brake_dist*speed_factor + STOP_DIST:
                         for i in range(LOOKAHEAD_WPS):
                             idx_wp = (start+i) % len(self.base_waypoints)
                             dist_tl = self.distance(self.base_waypoints[idx_wp].pose.pose.position,
                                                     self.base_waypoints[self.next_traffic_light_index].pose.pose.position)
-                            goal_speed = dist_tl / ego_dist_tl * clv
+                            goal_speed = (dist_tl - STOP_DIST) / ego_dist_tl * clv
                             goal_speed = goal_speed if goal_speed>0.0 else 0.0
                             goal_speed = clv if goal_speed > clv else goal_speed
                             self.base_waypoints[idx_wp].twist.twist.linear.x = goal_speed
@@ -156,15 +157,17 @@ class WaypointUpdater(object):
                             idx_wp = (start+i) % len(self.base_waypoints)
                             dist_tl = self.distance(self.base_waypoints[idx_wp].pose.pose.position,
                                                     self.base_waypoints[self.next_traffic_light_index].pose.pose.position)
-                            if dist_tl > self.brake_dist*speed_factor:
+                            if dist_tl > self.brake_dist*speed_factor + STOP_DIST:
                                 goal_speed = self.MAX_SPEED
-                                self.stop['speed_factor'] = self.curr_linear_velocity / self.MAX_SPEED
+                                self.stop['speed_factor'] = (self.curr_linear_velocity / NORM_SPEED)**2.0
                                 self.stop['clv'] = self.curr_linear_velocity
                             else:
-                                goal_speed = dist_tl / self.brake_dist * clv
+                                goal_speed = (dist_tl - STOP_DIST) / self.brake_dist * clv
                                 goal_speed = goal_speed if goal_speed > 0.0 else 0.0
                                 goal_speed = clv if goal_speed > clv else goal_speed
                             self.base_waypoints[idx_wp].twist.twist.linear.x = goal_speed
+                        self.stop['ego_dist_tl'] = self.distance(self.pose.position, 
+                                                                 self.base_waypoints[self.next_traffic_light_index].pose.pose.position)
                 else:
                     self.stop={}
                     for i in range(LOOKAHEAD_WPS):
