@@ -13,13 +13,13 @@ class Controller(object):
     def __init__(self, yaw_controller, p_brake):
         # TODO: Implement
         # defining 2 PID controllers
-        self.throttle_pid = PID(kp=0.4, ki=0.04, kd=0.1, mn=-1.0, mx=1.0)
+        self.throttle_pid = PID(kp=0.4, ki=0.03, kd=0.1, mn=-1.0, mx=1.0)
         self.brake_pid = PID(kp=p_brake, ki=0.0, kd=0.0, mn=0.0, mx=100000.)
         self.yaw_controller = yaw_controller
         self.des_speed_filter = LowPassFilter2(0.75, 0.) 
         self.throttle_brake_offs = -1.0
         self.throttle_direct = 0.0
-        self.standstill_velocity = 0.01
+        self.standstill_velocity = 1.0
         self.standstill_brake = -2.0*p_brake*self.throttle_brake_offs
         self.standstill_filter_time = 1.0
         self.standstill_filter = LowPassFilter2(self.standstill_filter_time, 0.0)
@@ -56,7 +56,7 @@ class Controller(object):
                 brake_ = 0.
                 self.standstill_filter.init(0.)
         elif lin_vel_err <= self.throttle_brake_offs:
-            self.throttle_pid.decay(delta_time, 0.75)
+            self.throttle_pid.decay(delta_time, 0.5)
             throttle_ = 0.
             brake_ = self.brake_pid.step(-(lin_vel_err-self.throttle_brake_offs), delta_time)
             self.standstill_filter.init(brake_)
