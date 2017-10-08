@@ -217,8 +217,14 @@ class WaypointUpdater(object):
         if (self.base_waypoints) and (self.pose):
             next_wp = int(self.closest_waypoint(self.pose, self.base_waypoints))
             if next_wp!=self.next_wp:
+                if (self.next_wp == None):
+                    self.next_wp = next_wp
+                if self.next_traffic_light_index>0:
+                    disttl=self.distance(self.base_waypoints[next_wp].pose.pose.position, self.base_waypoints[self.next_traffic_light_index].pose.pose.position)
+                else:
+                    disttl=0.0
+                rospy.logwarn("Next wp: "+str(next_wp)+", dist: "+str(self.distance(self.base_waypoints[next_wp].pose.pose.position, self.base_waypoints[self.next_wp].pose.pose.position))+" / "+str(disttl))
                 self.next_wp = next_wp
-                #rospy.logwarn("Next waypoint: "+str(next_wp))
         self.last_timestamp = rospy.get_rostime()
         
     def current_velocity_cb(self, message):

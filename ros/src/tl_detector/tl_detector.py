@@ -18,7 +18,7 @@ from keras.models import load_model
 
 STATE_COUNT_THRESHOLD = 3
 #LIGHTGAP = 5 # number of waypoints between the traffic light and the stop line
-LOOKAHEAD_DIST = 61 # distance as tl in sight
+LOOKAHEAD_DIST = 100.0 # distance [m] as tl in sight 
 
 class TLDetector(object):
     def __init__(self):
@@ -208,7 +208,7 @@ class TLDetector(object):
         tl_waypoint_indices = self.get_traffic_light_wp_index(light_positions)
         for i, tl_wp_idx in enumerate(tl_waypoint_indices):
             
-            tl_wp = self.base_waypoints[tl_wp_idx]
+            tl_wp = self.base_waypoints[tl_wp_idx+8] # the wp index defines the stop line; we can see the tl still a few wp's later
             dist = self.distance(tl_wp, self.pose)
             
             #idx_diff = tl_wp_idx - car_wp_idx
