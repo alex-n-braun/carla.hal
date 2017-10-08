@@ -1,15 +1,15 @@
 {
     "speed_err": {
         "p": 0.4,
-        "i": 0.02,
+        "i": 0.04,
         "d": 0.1
     },
     "throttle_direct": 0.0,
-    "lowpass_linvel": 1.5,
+    "lowpass_linvel": 0.75,
     "throttle_brake_offs": -1.0,
     "standstill": {
         "velocity": 0.01,
         "brake": 800.0,
         "filter_time": 1.0
-    },
+    }
 }
