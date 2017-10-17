@@ -38,6 +38,7 @@
 // C++ includes
 #include <memory>
 #include "libwaypoint_follower.h"
+#include "lowpass.h"
 
 enum class Mode
 {
@@ -72,6 +73,9 @@ private:
   int num_of_next_waypoint_;
   geometry_msgs::Point position_of_next_target_;
   double lookahead_distance_;
+  
+  Lowpass displacement_lowpass_;
+  ros::Time current_time_;
 
   geometry_msgs::PoseStamped current_pose_;
   geometry_msgs::TwistStamped current_velocity_;
@@ -83,7 +87,7 @@ private:
   double calcRadius(geometry_msgs::Point target) const;
   bool interpolateNextTarget(int next_waypoint, geometry_msgs::Point *next_target) const;
   bool verifyFollowing() const;
-  geometry_msgs::Twist calcTwist(double curvature, double cmd_velocity) const;
+  geometry_msgs::Twist calcTwist(double curvature, double cmd_velocity);
   void getNextWaypoint();
   geometry_msgs::TwistStamped outputZero() const;
   geometry_msgs::TwistStamped outputTwist(geometry_msgs::Twist t) const;
@@ -105,6 +109,8 @@ public:
     , velocity_set_(false)
     , num_of_next_waypoint_(-1)
     , lookahead_distance_(0)
+    , displacement_lowpass_(1.0, 0.)
+    , current_time_(ros::Time::now())
   {
   }
   ~PurePursuit()

@@ -249,25 +249,33 @@ bool PurePursuit::verifyFollowing() const
     return false;
   }
 }
-geometry_msgs::Twist PurePursuit::calcTwist(double curvature, double cmd_velocity) const
+geometry_msgs::Twist PurePursuit::calcTwist(double curvature, double cmd_velocity) 
 {
   // verify whether vehicle is following the path
   bool following_flag = verifyFollowing();
-  static double prev_angular_velocity = 0;
+//  static double prev_angular_velocity = 0;
 
   geometry_msgs::Twist twist;
   twist.linear.x = cmd_velocity;
   if (!following_flag)
   {
     //ROS_ERROR_STREAM("Not following");
+  
     twist.angular.z = current_velocity_.twist.linear.x * curvature;
+    displacement_lowpass_.init(twist.angular.z);
   }
   else
   {
-    twist.angular.z = prev_angular_velocity;
+    ros::Time next_time( ros::Time::now() );
+    double delta_time( ros::Duration(next_time - current_time_).toSec() );
+    current_time_ = next_time;
+  
+    twist.angular.z = displacement_lowpass_.filt(
+        current_velocity_.twist.linear.x * curvature, delta_time);
+//    twist.angular.z = prev_angular_velocity;
   }
 
-  prev_angular_velocity = twist.angular.z;
+//  prev_angular_velocity = twist.angular.z;
   return twist;
 }
 
