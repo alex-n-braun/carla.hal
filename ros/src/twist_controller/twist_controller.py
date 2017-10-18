@@ -13,7 +13,7 @@ class Controller(object):
     def __init__(self, yaw_controller, p_brake):
         # TODO: Implement
         # defining 2 PID controllers
-        self.throttle_pid = PID(kp=0.4, ki=0.02, kd=0.1, mn=-1.0, mx=1.0)
+        self.throttle_pid = PID(kp=0.4, ki=0.03, kd=0.1, mn=-1.0, mx=1.0)
         self.brake_pid = PID(kp=p_brake, ki=0.0, kd=0.0, mn=0.0, mx=100000.)
         self.yaw_controller = yaw_controller
         self.des_speed_filter = LowPassFilter2(0.75, 0.) 
@@ -35,11 +35,11 @@ class Controller(object):
         filt_lin_vel_err = filt_linear_velocity - current_velocity
         lin_vel_err = linear_velocity - current_velocity
         
-        throttle_ = self.throttle_pid.step(filt_lin_vel_err, delta_time) + self.throttle_direct * linear_velocity
-        if throttle_ < 0.0:
-            throttle_ = 0.0
+        #throttle_ = self.throttle_pid.step(filt_lin_vel_err, delta_time) + self.throttle_direct * linear_velocity
+        #if throttle_ < 0.0:
+        #    throttle_ = 0.0
         
-        brake_ = self.brake_pid.step(-(lin_vel_err-self.throttle_brake_offs), delta_time)
+        #brake_ = self.brake_pid.step(-(lin_vel_err-self.throttle_brake_offs), delta_time)
         #rospy.logwarn(self.throttle_pid.get_state())
         
         if lin_vel_err > self.throttle_brake_offs:
@@ -50,11 +50,15 @@ class Controller(object):
                 self.throttle_pid.reset()
                 rospy.logwarn("--- standstill --- "+str(brake_))
             else:
+                throttle_ = self.throttle_pid.step(filt_lin_vel_err, delta_time) + self.throttle_direct * linear_velocity
+                if throttle_ < 0.0:
+                    throttle_ = 0.0
                 brake_ = 0.
                 self.standstill_filter.init(0.)
         elif lin_vel_err <= self.throttle_brake_offs:
-            self.throttle_pid.reset()
+            self.throttle_pid.decay(delta_time, 0.5)
             throttle_ = 0.
+            brake_ = self.brake_pid.step(-(lin_vel_err-self.throttle_brake_offs), delta_time)
             self.standstill_filter.init(brake_)
             rospy.logwarn("--- brake --- "+str(brake_))
         else:

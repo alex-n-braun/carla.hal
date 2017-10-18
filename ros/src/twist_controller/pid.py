@@ -1,4 +1,6 @@
 
+import math
+
 MIN_NUM = float('-inf')
 MAX_NUM = float('inf')
 
@@ -17,6 +19,10 @@ class PID(object):
     def reset(self):
         self.int_val = 0.0
         self.last_error = None
+        
+    def decay(self, delta_time, tau):
+        self.last_error = None
+        self.int_val = self.int_val * math.exp(-delta_time/tau)
 
     def step(self, error, sample_time):
         integral = self.int_val + error * sample_time * self.ki;
